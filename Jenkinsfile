@@ -1,10 +1,6 @@
 pipeline {
   agent any
 
-  environment {
-    CISCO_CREDS = credentials('cisco-ssh-creds')
-  }
-
   stages {
     stage('Install Puppet') {
       steps {
@@ -13,7 +9,7 @@ pipeline {
           wget https://apt.puppet.com/puppet7-release-focal.deb -O puppet-release.deb
           sudo dpkg -i puppet-release.deb
           sudo apt-get update
-          sudo apt-get install -y puppet-agent
+          sudo apt-get install -y puppet-agent sshpass
         '''
       }
     }
@@ -24,8 +20,10 @@ pipeline {
           sh '''
             echo "[INFO] Running Puppet manifest..."
             export PATH=/opt/puppetlabs/bin:$PATH
-            puppet apply set_banner.pp --logdest console \
-              --execute "class { 'cisco_banner': cisco_user => '$CISCO_USER', cisco_pass => '$CISCO_PASS' }"
+            export FACTER_cisco_user=$CISCO_USER
+            export FACTER_cisco_pass=$CISCO_PASS
+
+            puppet apply set_banner.pp --logdest console
           '''
         }
       }
