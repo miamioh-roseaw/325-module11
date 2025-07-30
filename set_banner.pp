@@ -1,7 +1,7 @@
 class cisco_banner (
   String $cisco_user = Deferred('environment', ['CISCO_USER']),
   String $cisco_pass = Deferred('environment', ['CISCO_PASS']),
-  String $enable_pass = Deferred('environment', ['ENABLE_PASS']),
+  String $enable_pass = Deferred('environment', ['CISCO_PASS']),
 ) {
 
   $devices = ['10.10.10.1', '10.10.10.2', '10.10.10.3', '10.10.10.4', '10.10.10.5', '10.10.10.6', '10.10.10.7']
