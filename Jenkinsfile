@@ -26,13 +26,8 @@ pipeline {
         ]) {
           sh '''
             echo "[INFO] Running Puppet manifest..."
-            puppet apply set_banner.pp --logdest console --execute "
-              class { 'cisco_banner':
-                cisco_user  => '${CISCO_USER}',
-                cisco_pass  => '${CISCO_PASS}',
-                enable_pass => '${ENABLE_PASS}',
-              }
-            "
+            puppet apply set_banner.pp --logdest console \
+              --execute " \$cisco_user='${CISCO_USER}' \$cisco_pass='${CISCO_PASS}' \$enable_pass='${ENABLE_PASS}' include cisco_banner"
           '''
         }
       }
