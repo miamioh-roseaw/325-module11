@@ -6,6 +6,7 @@ pipeline {
     CISCO_CREDS = credentials('cisco-ssh-creds')
     CISCO_USER = "${CISCO_CREDS_USR}"
     CISCO_PASS = "${CISCO_CREDS_PSW}"
+    PUPPET_PATH = "/opt/puppetlabs/bin"
   }
 
   stages {
@@ -14,14 +15,12 @@ pipeline {
       steps {
         sh '''
           echo "[INFO] Checking if Puppet is installed..."
-          if ! command -v puppet > /dev/null; then
+          if ! /opt/puppetlabs/bin/puppet --version > /dev/null 2>&1; then
             echo "[INFO] Installing Puppet..."
             wget https://apt.puppet.com/puppet7-release-focal.deb -O puppet7.deb
             sudo dpkg -i puppet7.deb
             sudo apt-get update
             sudo apt-get install -y puppet-agent
-            echo 'export PATH=/opt/puppetlabs/bin:$PATH' >> ~/.bashrc
-            export PATH=/opt/puppetlabs/bin:$PATH
           else
             echo "[INFO] Puppet is already installed."
           fi
@@ -35,8 +34,7 @@ pipeline {
 
         withCredentials([usernamePassword(credentialsId: 'cisco-ssh-creds', usernameVariable: 'CISCO_USER', passwordVariable: 'CISCO_PASS')]) {
           sh '''
-            export CISCO_USER=$CISCO_USER
-            export CISCO_PASS=$CISCO_PASS
+            export PATH=/opt/puppetlabs/bin:$PATH
             echo "[INFO] Executing Puppet manifest..."
             puppet apply set_banner.pp
           '''
