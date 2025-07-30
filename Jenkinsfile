@@ -14,8 +14,6 @@ pipeline {
           sudo dpkg -i puppet-release.deb
           sudo apt-get update
           sudo apt-get install -y puppet-agent
-          export PATH=/opt/puppetlabs/bin:$PATH
-          puppet --version
         '''
       }
     }
@@ -24,13 +22,10 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'cisco-ssh-creds', usernameVariable: 'CISCO_USER', passwordVariable: 'CISCO_PASS')]) {
           sh '''
-            echo "[INFO] Exporting PATH and credentials..."
-            export PATH=/opt/puppetlabs/bin:$PATH
-            export CISCO_USER=$CISCO_USER
-            export CISCO_PASS=$CISCO_PASS
-
             echo "[INFO] Running Puppet manifest..."
-            puppet apply set_banner.pp --logdest console
+            export PATH=/opt/puppetlabs/bin:$PATH
+            puppet apply set_banner.pp --logdest console \
+              --execute "class { 'cisco_banner': cisco_user => '$CISCO_USER', cisco_pass => '$CISCO_PASS' }"
           '''
         }
       }
