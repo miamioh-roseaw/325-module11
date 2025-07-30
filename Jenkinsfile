@@ -16,7 +16,7 @@ pipeline {
           sh '''
             export PATH=/opt/puppetlabs/bin:$PATH
             echo "[INFO] Executing Puppet manifest..."
-            puppet apply set_banner.pp --logdest console --execute "
+            puppet apply set_banner.pp --logdest console "
               class { 'cisco_banner':
                 cisco_user  => '${CISCO_USER}',
                 cisco_pass  => '${CISCO_PASS}',
