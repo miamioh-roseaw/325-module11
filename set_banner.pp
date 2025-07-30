@@ -12,3 +12,9 @@ class cisco_banner (
     }
   }
 }
+
+# Apply the class with passed-in values
+class { 'cisco_banner':
+  cisco_user => $::cisco_user,
+  cisco_pass => $::cisco_pass,
+}
