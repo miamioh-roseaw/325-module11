@@ -13,10 +13,10 @@ pipeline {
           string(credentialsId: 'cisco-enable-pass', variable: 'ENABLE_PASS')
         ]) {
           sh '''
-            echo "[INFO] Running Puppet manifest..."
-            export CISCO_USER=$CISCO_USER
-            export CISCO_PASS=$CISCO_PASS
-            export ENABLE_PASS=$ENABLE_PASS
+            echo "[INFO] Templating Puppet manifest with credentials..."
+            envsubst < set_banner_template.pp > set_banner.pp
+
+            echo "[INFO] Applying Puppet manifest..."
             puppet apply set_banner.pp --logdest console
           '''
         }
