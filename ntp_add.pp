@@ -20,8 +20,8 @@ define cisco::ntp_add(
   $ssh      = "sshpass -p \"${d}CISCO_PASS\" ssh     ${ssh_opts} \"${d}CISCO_USER@${ip}\""
 
   # Guard: skip only when EVERY desired server is present exactly
-  $per_server_checks = $servers.map |$s| { "${ssh} \"show running-config\" | grep -Fx \"ntp server ${s}\" >/dev/null" }
-  $guard_cmd = $per_server_checks.join(' && ')
+  #$per_server_checks = $servers.map |$s| { "${ssh} \"show running-config\" | grep -Fx \"ntp server ${s}\" >/dev/null" }
+  #$guard_cmd = $per_server_checks.join(' && ')
 
   exec { "ntp_${ip}":
     command   => "${ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${enforce_cmds} ; end ; write memory\"",
