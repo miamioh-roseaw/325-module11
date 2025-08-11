@@ -1,6 +1,6 @@
 package { ['sshpass','openssh-client']: ensure => installed }
 
-define cisco::ntp(
+define cisco::ntp_add(
   String        $ip,
   Array[String] $servers,
 ) {
@@ -17,7 +17,7 @@ define cisco::ntp(
 
   exec { "ntp_${ip}":
     command   => "${ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${ntp_cmds} ; end ; write memory\"",
-    unless    => $guard_cmd,
+    #unless    => $guard_cmd,
     path      => ['/usr/bin','/bin'],
     timeout   => 180,
     logoutput => 'on_failure',
@@ -28,10 +28,10 @@ define cisco::ntp(
 # Apply to all devices
 $ntp_servers = ['129.6.15.28','129.6.15.29']
 
-cisco::ntp_only { 'mgmt-rtr': ip => '10.10.10.1', servers => $ntp_servers }
-cisco::ntp_only { 'reg-rtr':  ip => '10.10.10.2', servers => $ntp_servers }
-cisco::ntp_only { 'ham-rtr':  ip => '10.10.10.3', servers => $ntp_servers }
-cisco::ntp_only { 'mid-rtr':  ip => '10.10.10.4', servers => $ntp_servers }
-cisco::ntp_only { 'mgmt-sw':  ip => '10.10.10.5', servers => $ntp_servers }
-cisco::ntp_only { 'ham-sw':   ip => '10.10.10.6', servers => $ntp_servers }
-cisco::ntp_only { 'mid-sw':   ip => '10.10.10.7', servers => $ntp_servers }
+cisco::ntp_add { 'mgmt-rtr': ip => '10.10.10.1', servers => $ntp_servers }
+cisco::ntp_add { 'reg-rtr':  ip => '10.10.10.2', servers => $ntp_servers }
+cisco::ntp_add { 'ham-rtr':  ip => '10.10.10.3', servers => $ntp_servers }
+cisco::ntp_add { 'mid-rtr':  ip => '10.10.10.4', servers => $ntp_servers }
+cisco::ntp_add { 'mgmt-sw':  ip => '10.10.10.5', servers => $ntp_servers }
+cisco::ntp_add { 'ham-sw':   ip => '10.10.10.6', servers => $ntp_servers }
+cisco::ntp_add { 'mid-sw':   ip => '10.10.10.7', servers => $ntp_servers }
