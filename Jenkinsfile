@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     PATH = "/opt/puppetlabs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    PUPPET_MANIFEST = "manifests/ntp_timezone.pp"
+    PUPPET_MANIFEST = "ntp_timezone.pp"
   }
 
   options { timestamps() }
