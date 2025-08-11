@@ -4,7 +4,7 @@ package { ['sshpass','openssh-client']:
 }
 
 # Configure NTP servers on a Cisco IOS device (single SSH, idempotent)
-define cisco::ntp_only(
+define cisco::ntp(
   String        $ip,
   Array[String] $servers,
 ) {
