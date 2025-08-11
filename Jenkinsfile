@@ -35,12 +35,11 @@ pipeline {
           credentialsId: 'cisco-ssh-creds',
           usernameVariable: 'CISCO_USER',
           passwordVariable: 'CISCO_PASS'
+          enableVariable: 'CISCO_PASS'
         )]) {
           sh '''
             bash -lc '
               set -eu
-              # Use same secret for enable unless you store a separate one
-              : "${ENABLE_PASS:=$CISCO_PASS}"
 
               echo "[INFO] Applying ${PUPPET_MANIFEST} ..."
               puppet apply "${PUPPET_MANIFEST}" --logdest console --detailed-exitcodes || ec=$?
