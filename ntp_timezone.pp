@@ -11,25 +11,28 @@ define cisco::ntp_timezone(
   Integer       $offset_minutes = 0,
   Array[String] $servers,
 ) {
-  # Device-side commands
+  # Build device-side commands
   $tz_cmd        = "clock timezone ${zone} ${offset_hours} ${offset_minutes}"
   $ntp_cmds      = $servers.map |$s| { "ntp server ${s}" }.join(' ; ')
   $servers_str   = join($servers, '|')
   $servers_count = length($servers)
   $ntp_regex     = "^ntp server (${servers_str})$"
 
-  # SSH command templates (single-quoted so $CISCO_* stay literal)
-  $ssh_tty = sprintf('sshpass -p "$CISCO_PASS" ssh -tt -o StrictHostKeyChecking=no "$CISCO_USER@%s"', $ip)
-  $ssh     = sprintf('sshpass -p "$CISCO_PASS" ssh     -o StrictHostKeyChecking=no "$CISCO_USER@%s"', $ip)
+  # Keep shell env vars literal by composing them from a literal dollar
+  $d = '$'
+
+  # SSH command templates
+  $ssh_tty = "sshpass -p \"${d}CISCO_PASS\" ssh -tt -o StrictHostKeyChecking=no \"${d}CISCO_USER@${ip}\""
+  $ssh     = "sshpass -p \"${d}CISCO_PASS\" ssh     -o StrictHostKeyChecking=no \"${d}CISCO_USER@${ip}\""
 
   # Apply in one session (ENABLE_PASS must be exported by Jenkins; mirror from CISCO_PASS if needed)
-  $apply_cmd = sprintf('%s "enable ; $ENABLE_PASS ; conf t ; %s ; %s ; end ; write memory"',
-                       $ssh_tty, $tz_cmd, $ntp_cmds)
+  $apply_cmd = "${ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${tz_cmd} ; ${ntp_cmds} ; end ; write memory\""
 
-  # Idempotence guard: timezone line present AND all desired NTP server lines present
-  $guard_cmd = sprintf('%s "terminal length 0 ; show running-config" | grep -F ''%s'' >/dev/null && ' +
-                       '%s "show running-config" | awk ''/^ntp server /{print $0}'' | grep -E ''%s'' | sort -u | wc -l | grep -q "^%d"$',
-                       $ssh, $tz_cmd, $ssh, $ntp_regex, $servers_count)
+  # Idempotence guard:
+  #  1) timezone line present
+  #  2) number of our desired NTP server lines present equals $servers_count
+  $guard_cmd = "${ssh} \"terminal length 0 ; show running-config\" | grep -F '${tz_cmd}' >/dev/null " +
+               "&& ${ssh} \"show running-config\" | awk '/^ntp server /{print \\$0}' | grep -E '${ntp_regex}' | sort -u | wc -l | grep -q '^${servers_count}$'"
 
   exec { "ntp_tz_${ip}":
     command   => $apply_cmd,
