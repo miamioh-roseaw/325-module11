@@ -57,4 +57,47 @@ cisco::ntp_timezone { 'mgmt-rtr':
   zone           => $tz_zone,
   offset_hours   => $tz_off_hr,
   offset_minutes => $tz_off_min,
-  servers        => $ntp_servers_
+  servers        => $ntp_servers,
+}
+cisco::ntp_timezone { 'reg-rtr':
+  ip             => '10.10.10.2',
+  zone           => $tz_zone,
+  offset_hours   => $tz_off_hr,
+  offset_minutes => $tz_off_min,
+  servers        => $ntp_servers,
+}
+cisco::ntp_timezone { 'ham-rtr':
+  ip             => '10.10.10.3',
+  zone           => $tz_zone,
+  offset_hours   => $tz_off_hr,
+  offset_minutes => $tz_off_min,
+  servers        => $ntp_servers,
+}
+cisco::ntp_timezone { 'mid-rtr':
+  ip             => '10.10.10.4',
+  zone           => $tz_zone,
+  offset_hours   => $tz_off_hr,
+  offset_minutes => $tz_off_min,
+  servers        => $ntp_servers,
+}
+cisco::ntp_timezone { 'mgmt-sw':
+  ip             => '10.10.10.5',
+  zone           => $tz_zone,
+  offset_hours   => $tz_off_hr,
+  offset_minutes => $tz_off_min,
+  servers        => $ntp_servers,
+}
+cisco::ntp_timezone { 'ham-sw':
+  ip             => '10.10.10.6',
+  zone           => $tz_zone,
+  offset_hours   => $tz_off_hr,
+  offset_minutes => $tz_off_min,
+  servers        => $ntp_servers,
+}
+cisco::ntp_timezone { 'mid-sw':
+  ip             => '10.10.10.7',
+  zone           => $tz_zone,
+  offset_hours   => $tz_off_hr,
+  offset_minutes => $tz_off_min,
+  servers        => $ntp_servers,
+}
