@@ -1,10 +1,10 @@
-// Jenkins Declarative Pipeline to apply the NTP-only Puppet manifest
+// Jenkins Declarative Pipeline to apply the NTP-add Puppet manifest
 pipeline {
   agent any
 
   environment {
     PATH = "/opt/puppetlabs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    PUPPET_MANIFEST = "ntp.pp"   // <- path to the .pp you committed
+    PUPPET_MANIFEST = "ntp_add.pp"   // <- path to the .pp you committed
   }
 
   options { timestamps() }
