@@ -1,4 +1,3 @@
-# Minimal looped manifest: remove banners + set two NTP servers on all devices.
 # Edit only the $payload_lines array (one Cisco command per element, end each with \n).
 
 package { ['sshpass','openssh-client']: ensure => installed }
