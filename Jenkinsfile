@@ -28,7 +28,35 @@ pipeline {
         '''
       }
     }
-
+    stage('Pre-Check NTP (all devices)') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'cisco-ssh-creds',
+                                          usernameVariable: 'CISCO_USER',
+                                          passwordVariable: 'CISCO_PASS')]) {
+          sh '''
+            bash -lc '
+              set -u
+              : "${ENABLE_PASS:=$CISCO_PASS}"
+    
+              IPS=(10.10.10.1 10.10.10.2 10.10.10.3 10.10.10.4 10.10.10.5 10.10.10.6 10.10.10.7)
+              SSH_OPTS="-o StrictHostKeyChecking=no -o KexAlgorithms=+diffie-hellman-group1-sha1 -o HostKeyAlgorithms=+ssh-rsa"
+              OUT="ntp_before.txt"
+              : > "$OUT"
+    
+              for ip in "${IPS[@]}"; do
+                echo "===== ${ip} (before) =====" | tee -a "$OUT"
+                sshpass -p "$CISCO_PASS" ssh $SSH_OPTS "$CISCO_USER@$ip" \
+                  "show running-config | include ^ntp server" \
+                  2>&1 | tee -a "$OUT" || true
+                echo | tee -a "$OUT"
+              done
+    
+              echo "[INFO] Saved pre-check to $OUT"
+            '
+          '''
+        }
+      }
+    }
     stage('Apply NTP to Cisco Devices') {
       steps {
         withCredentials([
