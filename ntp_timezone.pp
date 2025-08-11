@@ -3,16 +3,11 @@ package { ['sshpass','openssh-client']:
   ensure => installed,
 }
 
-# Timezone + NTP in one SSH session (idempotent)
-define cisco::ntp_timezone(
+# Configure NTP servers on a Cisco IOS device (single SSH, idempotent)
+define cisco::ntp_only(
   String        $ip,
-  String        $zone,
-  Integer       $offset_hours,
-  Integer       $offset_minutes = 0,
   Array[String] $servers,
 ) {
-  # Build device-side commands
-  $tz_cmd        = "clock timezone ${zone} ${offset_hours} ${offset_minutes}"
   $ntp_cmds      = $servers.map |$s| { "ntp server ${s}" }.join(' ; ')
   $servers_str   = join($servers, '|')
   $servers_count = length($servers)
@@ -25,16 +20,13 @@ define cisco::ntp_timezone(
   $ssh_tty = "sshpass -p \"${d}CISCO_PASS\" ssh -tt -o StrictHostKeyChecking=no \"${d}CISCO_USER@${ip}\""
   $ssh     = "sshpass -p \"${d}CISCO_PASS\" ssh     -o StrictHostKeyChecking=no \"${d}CISCO_USER@${ip}\""
 
-  # Apply in one session (ENABLE_PASS must be exported by Jenkins; mirror from CISCO_PASS if needed)
-  $apply_cmd = "${ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${tz_cmd} ; ${ntp_cmds} ; end ; write memory\""
+  # Apply in one session
+  $apply_cmd = "${ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${ntp_cmds} ; end ; write memory\""
 
-  # Idempotence guard:
-  #  1) timezone line present
-  #  2) number of our desired NTP server lines present equals $servers_count
-  $guard_cmd = "${ssh} \"terminal length 0 ; show running-config\" | grep -F '${tz_cmd}' >/dev/null " +
-               "&& ${ssh} \"show running-config\" | awk '/^ntp server /{print \\$0}' | grep -E '${ntp_regex}' | sort -u | wc -l | grep -q '^${servers_count}$'"
+  # Idempotence guard: count of desired NTP servers present
+  $guard_cmd = "${ssh} \"show running-config\" | awk '/^ntp server /{print \\$0}' | grep -E '${ntp_regex}' | sort -u | wc -l | grep -q '^${servers_count}$'"
 
-  exec { "ntp_tz_${ip}":
+  exec { "ntp_${ip}":
     command   => $apply_cmd,
     unless    => $guard_cmd,
     path      => ['/usr/bin','/bin'],
@@ -48,28 +40,25 @@ define cisco::ntp_timezone(
 # Apply to all your Cisco boxes
 # -----------------------------
 $ntp_servers = ['129.6.15.28','129.6.15.29']
-$tz_zone     = 'EST'
-$tz_off_hr   = -5
-$tz_off_min  = 0
 
-cisco::ntp_timezone { 'mgmt-rtr':
-  ip => '10.10.10.1', zone => $tz_zone, offset_hours => $tz_off_hr, offset_minutes => $tz_off_min, servers => $ntp_servers,
+cisco::ntp_only { 'mgmt-rtr':
+  ip => '10.10.10.1', servers => $ntp_servers,
 }
-cisco::ntp_timezone { 'reg-rtr':
-  ip => '10.10.10.2', zone => $tz_zone, offset_hours => $tz_off_hr, offset_minutes => $tz_off_min, servers => $ntp_servers,
+cisco::ntp_only { 'reg-rtr':
+  ip => '10.10.10.2', servers => $ntp_servers,
 }
-cisco::ntp_timezone { 'ham-rtr':
-  ip => '10.10.10.3', zone => $tz_zone, offset_hours => $tz_off_hr, offset_minutes => $tz_off_min, servers => $ntp_servers,
+cisco::ntp_only { 'ham-rtr':
+  ip => '10.10.10.3', servers => $ntp_servers,
 }
-cisco::ntp_timezone { 'mid-rtr':
-  ip => '10.10.10.4', zone => $tz_zone, offset_hours => $tz_off_hr, offset_minutes => $tz_off_min, servers => $ntp_servers,
+cisco::ntp_only { 'mid-rtr':
+  ip => '10.10.10.4', servers => $ntp_servers,
 }
-cisco::ntp_timezone { 'mgmt-sw':
-  ip => '10.10.10.5', zone => $tz_zone, offset_hours => $tz_off_hr, offset_minutes => $tz_off_min, servers => $ntp_servers,
+cisco::ntp_only { 'mgmt-sw':
+  ip => '10.10.10.5', servers => $ntp_servers,
 }
-cisco::ntp_timezone { 'ham-sw':
-  ip => '10.10.10.6', zone => $tz_zone, offset_hours => $tz_off_hr, offset_minutes => $tz_off_min, servers => $ntp_servers,
+cisco::ntp_only { 'ham-sw':
+  ip => '10.10.10.6', servers => $ntp_servers,
 }
-cisco::ntp_timezone { 'mid-sw':
-  ip => '10.10.10.7', zone => $tz_zone, offset_hours => $tz_off_hr, offset_minutes => $tz_off_min, servers => $ntp_servers,
+cisco::ntp_only { 'mid-sw':
+  ip => '10.10.10.7', servers => $ntp_servers,
 }
