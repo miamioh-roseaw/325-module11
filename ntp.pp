@@ -1,35 +1,22 @@
-# Ensure required tools are present
-package { ['sshpass','openssh-client']:
-  ensure => installed,
-}
+package { ['sshpass','openssh-client']: ensure => installed }
 
-# Configure NTP servers on a Cisco IOS device (single SSH, idempotent)
 define cisco::ntp_only(
   String        $ip,
   Array[String] $servers,
 ) {
-  # Build device-side commands
-  $ntp_cmds      = $servers.map |$s| { "ntp server ${s}" }.join(' ; ')
-  $servers_str   = join($servers, '|')
-  $servers_count = length($servers)
-  $ntp_regex     = "^ntp server (${servers_str})$"
-
-  # Keep shell env vars literal
+  $ntp_cmds = $servers.map |$s| { "ntp server ${s}" }.join(' ; ')
   $d = '$'
 
-  # SSH command templates with legacy algos allowed (helps older IOS/IOS-XE)
   $ssh_opts = '-o StrictHostKeyChecking=no -o KexAlgorithms=+diffie-hellman-group1-sha1 -o HostKeyAlgorithms=+ssh-rsa'
   $ssh_tty  = "sshpass -p \"${d}CISCO_PASS\" ssh -tt ${ssh_opts} \"${d}CISCO_USER@${ip}\""
   $ssh      = "sshpass -p \"${d}CISCO_PASS\" ssh     ${ssh_opts} \"${d}CISCO_USER@${ip}\""
 
-  # Apply in one session
-  $apply_cmd = "${$ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${ntp_cmds} ; end ; write memory\""
-
-  # Idempotence guard: all desired NTP server lines must exist
-  $guard_cmd = "${$ssh} \"show running-config\" | awk '/^ntp server /{print \\$0}' | grep -E '${ntp_regex}' | sort -u | wc -l | grep -q '^${servers_count}$'"
+  # Build a guard that ONLY skips when *all* desired servers are present
+  $per_server_checks = $servers.map |$s| { "${ssh} \"show running-config\" | grep -Fx \"ntp server ${s}\" >/dev/null" }
+  $guard_cmd = $per_server_checks.join(' && ')
 
   exec { "ntp_${ip}":
-    command   => $apply_cmd,
+    command   => "${ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${ntp_cmds} ; end ; write memory\"",
     unless    => $guard_cmd,
     path      => ['/usr/bin','/bin'],
     timeout   => 180,
@@ -38,9 +25,7 @@ define cisco::ntp_only(
   }
 }
 
-# -----------------------------
-# Apply to all your Cisco boxes
-# -----------------------------
+# Apply to all devices
 $ntp_servers = ['129.6.15.28','129.6.15.29']
 
 cisco::ntp_only { 'mgmt-rtr': ip => '10.10.10.1', servers => $ntp_servers }
