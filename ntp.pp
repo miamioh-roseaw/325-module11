@@ -1,6 +1,6 @@
 package { ['sshpass','openssh-client']: ensure => installed }
 
-define cisco::ntp_only(
+define cisco::ntp(
   String        $ip,
   Array[String] $servers,
 ) {
