@@ -1,10 +1,10 @@
-// Jenkinsfile — runs the simple NTP-only Puppet manifest
+// Jenkinsfile — applies ntp_add.pp and verifies banners are removed
 pipeline {
   agent any
 
   environment {
     PATH = "/opt/puppetlabs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    PUPPET_MANIFEST = "ntp_add.pp"  
+    PUPPET_MANIFEST = "ntp_add.pp"
   }
 
   options { timestamps() }
@@ -34,12 +34,13 @@ pipeline {
         withCredentials([usernamePassword(
           credentialsId: 'cisco-ssh-creds',
           usernameVariable: 'CISCO_USER',
-          passwordVariable: 'CISCO_PASS',
-          enableVariable: 'CISCO_PASS'
+          passwordVariable: 'CISCO_PASS'
         )]) {
           sh '''
             bash -lc '
               set -eu
+              # Use same secret for enable unless you store a separate one
+              : "${ENABLE_PASS:=$CISCO_PASS}"
 
               echo "[INFO] Applying ${PUPPET_MANIFEST} ..."
               puppet apply "${PUPPET_MANIFEST}" --logdest console --detailed-exitcodes || ec=$?
@@ -54,47 +55,51 @@ pipeline {
         }
       }
     }
-  }
-stage('Verify banners removed') {
-  steps {
-    withCredentials([usernamePassword(
-      credentialsId: 'cisco-ssh-creds',
-      usernameVariable: 'CISCO_USER',
-      passwordVariable: 'CISCO_PASS'
-    )]) {
-      sh '''
-        bash -lc '
-          set -eu
-          : "${ENABLE_PASS:=$CISCO_PASS}"
 
-          IPS=(10.10.10.1 10.10.10.2 10.10.10.3 10.10.10.4 10.10.10.5 10.10.10.6 10.10.10.7)
-          SSH_OPTS="-o StrictHostKeyChecking=no -o KexAlgorithms=+diffie-hellman-group1-sha1 -o HostKeyAlgorithms=+ssh-rsa"
-          OUT="banner_check.txt"
-          : > "$OUT"
-          FAIL=0
+    stage('Verify banners removed') {
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'cisco-ssh-creds',
+          usernameVariable: 'CISCO_USER',
+          passwordVariable: 'CISCO_PASS'
+        )]) {
+          sh '''
+            bash -lc '
+              set -eu
+              : "${ENABLE_PASS:=$CISCO_PASS}"
 
-          for ip in "${IPS[@]}"; do
-            echo "===== ${ip} (banner check) =====" | tee -a "$OUT"
-            # Look for any banner commands present in running config
-            if sshpass -p "$CISCO_PASS" ssh $SSH_OPTS "$CISCO_USER@$ip" \
-                 "show running-config | include ^banner\\s+(login|motd|exec|incoming)" \
-                 | tee -a "$OUT" | grep -q . ; then
-              echo "[WARN] Banner lines found on ${ip}" | tee -a "$OUT"
-              FAIL=1
-            else
-              echo "OK: no banner lines on ${ip}" | tee -a "$OUT"
-            fi
-            echo | tee -a "$OUT"
-          done
+              IPS=(10.10.10.1 10.10.10.2 10.10.10.3 10.10.10.4 10.10.10.5 10.10.10.6 10.10.10.7)
+              SSH_OPTS="-o StrictHostKeyChecking=no -o KexAlgorithms=+diffie-hellman-group1-sha1 -o HostKeyAlgorithms=+ssh-rsa"
+              OUT="banner_check.txt"
+              : > "$OUT"
+              FAIL=0
 
-          echo "[INFO] Saved banner check to $OUT"
-          exit $FAIL
-        '
-      '''
+              for ip in "${IPS[@]}"; do
+                echo "===== ${ip} (banner check) =====" | tee -a "$OUT"
+                if sshpass -p "$CISCO_PASS" ssh $SSH_OPTS "$CISCO_USER@$ip" \
+                     "show running-config | include ^banner\\s\\+(login|motd|exec|incoming)" \
+                     | tee -a "$OUT" | grep -q . ; then
+                  echo "[WARN] Banner lines found on ${ip}" | tee -a "$OUT"
+                  FAIL=1
+                else
+                  echo "OK: no banner lines on ${ip}" | tee -a "$OUT"
+                fi
+                echo | tee -a "$OUT"
+              done
+
+              echo "[INFO] Saved banner check to $OUT"
+              exit $FAIL
+            '
+          '''
+        }
+      }
     }
   }
-}
+
   post {
-    always { echo "Build finished." }
+    always {
+      archiveArtifacts artifacts: 'banner_check.txt', allowEmptyArchive: true
+      echo "Build finished."
+    }
   }
 }
