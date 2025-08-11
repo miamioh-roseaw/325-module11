@@ -34,7 +34,7 @@ pipeline {
         withCredentials([usernamePassword(
           credentialsId: 'cisco-ssh-creds',
           usernameVariable: 'CISCO_USER',
-          passwordVariable: 'CISCO_PASS'
+          passwordVariable: 'CISCO_PASS',
           enableVariable: 'CISCO_PASS'
         )]) {
           sh '''
