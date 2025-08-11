@@ -1,52 +1,66 @@
-# Ensure required tools are present
-package { ['sshpass','openssh-client']:
-  ensure => installed,
-}
+// Jenkins Declarative Pipeline to apply the NTP-only Puppet manifest
+pipeline {
+  agent any
 
-# Configure NTP servers on a Cisco IOS device (single SSH, idempotent)
-define cisco::ntp(
-  String        $ip,
-  Array[String] $servers,
-) {
-  # Build device-side commands
-  $ntp_cmds      = $servers.map |$s| { "ntp server ${s}" }.join(' ; ')
-  $servers_str   = join($servers, '|')
-  $servers_count = length($servers)
-  $ntp_regex     = "^ntp server (${servers_str})$"
+  environment {
+    PATH = "/opt/puppetlabs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    PUPPET_MANIFEST = "manifests/ntp_only.pp"   // <- path to the .pp you committed
+  }
 
-  # Keep shell env vars literal
-  $d = '$'
+  options { timestamps() }
 
-  # SSH command templates with legacy algos allowed (helps older IOS/IOS-XE)
-  $ssh_opts = '-o StrictHostKeyChecking=no -o KexAlgorithms=+diffie-hellman-group1-sha1 -o HostKeyAlgorithms=+ssh-rsa'
-  $ssh_tty  = "sshpass -p \"${d}CISCO_PASS\" ssh -tt ${ssh_opts} \"${d}CISCO_USER@${ip}\""
-  $ssh      = "sshpass -p \"${d}CISCO_PASS\" ssh     ${ssh_opts} \"${d}CISCO_USER@${ip}\""
+  stages {
+    stage('Install Puppet Agent (if needed)') {
+      steps {
+        sh '''
+          bash -lc '
+            set -eux
+            if ! command -v puppet >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y wget gnupg
+              wget -q https://apt.puppet.com/puppet7-release-focal.deb
+              sudo dpkg -i puppet7-release-focal.deb
+              sudo apt-get update
+              sudo apt-get install -y puppet-agent
+            fi
+            puppet --version
+          '
+        '''
+      }
+    }
 
-  # Apply in one session
-  $apply_cmd = "${$ssh_tty} \"enable ; ${d}ENABLE_PASS ; conf t ; ${ntp_cmds} ; end ; write memory\""
+    stage('Apply NTP to Cisco Devices') {
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'cisco-ssh-creds',
+            usernameVariable: 'CISCO_USER',
+            passwordVariable: 'CISCO_PASS'
+          )
+        ]) {
+          sh '''
+            bash -lc '
+              set -eux
+              # Use same secret for enable unless you store a separate one
+              : "${ENABLE_PASS:=$CISCO_PASS}"
 
-  # Idempotence guard: all desired NTP server lines must exist
-  $guard_cmd = "${$ssh} \"show running-config\" | awk '/^ntp server /{print \\$0}' | grep -E '${ntp_regex}' | sort -u | wc -l | grep -q '^${servers_count}$'"
+              echo "[INFO] Applying ${PUPPET_MANIFEST} ..."
+              puppet apply "${PUPPET_MANIFEST}" --logdest console --detailed-exitcodes || ec=$?
+              if [ "${ec:-0}" = "0" ] || [ "${ec:-0}" = "2" ]; then
+                echo "[INFO] Puppet apply succeeded (exit ${ec:-0})."
+                exit 0
+              else
+                echo "[ERROR] Puppet apply failed (exit ${ec})."
+                exit "${ec}"
+              fi
+            '
+          '''
+        }
+      }
+    }
+  }
 
-  exec { "ntp_${ip}":
-    command   => $apply_cmd,
-    unless    => $guard_cmd,
-    path      => ['/usr/bin','/bin'],
-    timeout   => 180,
-    logoutput => 'on_failure',
-    require   => Package['sshpass','openssh-client'],
+  post {
+    always { echo "Build finished." }
   }
 }
-
-# -----------------------------
-# Apply to all your Cisco boxes
-# -----------------------------
-$ntp_servers = ['129.6.15.28','129.6.15.29']
-
-cisco::ntp_only { 'mgmt-rtr': ip => '10.10.10.1', servers => $ntp_servers }
-cisco::ntp_only { 'reg-rtr':  ip => '10.10.10.2', servers => $ntp_servers }
-cisco::ntp_only { 'ham-rtr':  ip => '10.10.10.3', servers => $ntp_servers }
-cisco::ntp_only { 'mid-rtr':  ip => '10.10.10.4', servers => $ntp_servers }
-cisco::ntp_only { 'mgmt-sw':  ip => '10.10.10.5', servers => $ntp_servers }
-cisco::ntp_only { 'ham-sw':   ip => '10.10.10.6', servers => $ntp_servers }
-cisco::ntp_only { 'mid-sw':   ip => '10.10.10.7', servers => $ntp_servers }
