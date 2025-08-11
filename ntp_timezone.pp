@@ -11,24 +11,25 @@ define cisco::ntp_timezone(
   Integer       $offset_minutes = 0,
   Array[String] $servers,
 ) {
-  # Build device-side commands
+  # Device-side commands
   $tz_cmd        = "clock timezone ${zone} ${offset_hours} ${offset_minutes}"
   $ntp_cmds      = $servers.map |$s| { "ntp server ${s}" }.join(' ; ')
   $servers_str   = join($servers, '|')
   $servers_count = length($servers)
   $ntp_regex     = "^ntp server (${servers_str})$"
 
-  # Command strings (single-quoted templates => $CISCO_* remain literal),
-  # Puppet variables are inserted via sprintf placeholders.
+  # SSH command templates (single-quoted so $CISCO_* stay literal)
   $ssh_tty = sprintf('sshpass -p "$CISCO_PASS" ssh -tt -o StrictHostKeyChecking=no "$CISCO_USER@%s"', $ip)
-  $ssh     = sprintf('sshpass -p "$CISCO_PASS" ssh -o StrictHostKeyChecking=no "$CISCO_USER@%s"',     $ip)
+  $ssh     = sprintf('sshpass -p "$CISCO_PASS" ssh     -o StrictHostKeyChecking=no "$CISCO_USER@%s"', $ip)
 
+  # Apply in one session (ENABLE_PASS must be exported by Jenkins; mirror from CISCO_PASS if needed)
   $apply_cmd = sprintf('%s "enable ; $ENABLE_PASS ; conf t ; %s ; %s ; end ; write memory"',
                        $ssh_tty, $tz_cmd, $ntp_cmds)
 
-  $guard_cmd = sprintf('%s "terminal length 0 ; show running-config" | grep -F %s >/dev/null && ' +
-                       '%s "show running-config" | awk \'/^ntp server /{print $0}\' | grep -E %s | sort -u | wc -l | grep -q "^%d"$',
-                       $ssh, shellquote($tz_cmd), $ssh, shellquote($ntp_regex), $servers_count)
+  # Idempotence guard: timezone line present AND all desired NTP server lines present
+  $guard_cmd = sprintf('%s "terminal length 0 ; show running-config" | grep -F ''%s'' >/dev/null && ' +
+                       '%s "show running-config" | awk ''/^ntp server /{print $0}'' | grep -E ''%s'' | sort -u | wc -l | grep -q "^%d"$',
+                       $ssh, $tz_cmd, $ssh, $ntp_regex, $servers_count)
 
   exec { "ntp_tz_${ip}":
     command   => $apply_cmd,
@@ -40,7 +41,9 @@ define cisco::ntp_timezone(
   }
 }
 
-# ------------ Apply to all devices ------------
+# -----------------------------
+# Apply to all your Cisco boxes
+# -----------------------------
 $ntp_servers = ['129.6.15.28','129.6.15.29']
 $tz_zone     = 'EST'
 $tz_off_hr   = -5
